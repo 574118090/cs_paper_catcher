@@ -7,8 +7,6 @@ import warnings
 from dataclasses import dataclass
 from time import sleep
 from typing import List, Optional
-
-import matplotlib.pyplot as plt
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -34,10 +32,8 @@ class GoogleScholarConfig:
     save_csv: bool = True
     csvpath: str = "."
     sortby: str = "Citations"
-    plot_results: bool = False
-    start_year: Optional[int] = None
-    end_year: int = current_year
-    debug: bool = False
+    year: int = 2000
+    source: str = 'ACL'
 
 
 def google_scholar_spider(GoogleScholarConfig: GoogleScholarConfig):
@@ -53,48 +49,32 @@ def google_scholar_spider(GoogleScholarConfig: GoogleScholarConfig):
         data = fetch_data(GoogleScholarConfig, session, gscholar_main_url, pbar)
 
     # Create a dataset and sort by the number of citations
-    data_ranked = process_data(data, GoogleScholarConfig.end_year, GoogleScholarConfig.sortby)
+    data_ranked = process_data(data, GoogleScholarConfig.sortby)
 
-    # Plot by citation number
-    if GoogleScholarConfig.plot_results:
-        plot_results(data_ranked.index, data_ranked["Citations"], GoogleScholarConfig.keyword)
-
-    # Save results
-    if GoogleScholarConfig.save_csv:
-        save_data_to_csv(data_ranked, GoogleScholarConfig.csvpath, GoogleScholarConfig.keyword)
+    save_data_to_csv(data_ranked, GoogleScholarConfig.csvpath, f'{GoogleScholarConfig.source}_{GoogleScholarConfig.keyword}')
 
 
 def get_command_line_args() -> GoogleScholarConfig:
     parser = argparse.ArgumentParser(description='Arguments')
     parser.add_argument('--kw', type=str,
                         help="""Keyword to be searched. Use double quote followed by simple quote to search for an exact keyword. Example: "'exact keyword'" """)
+    parser.add_argument('--source', type=str,
+                        help='')
     parser.add_argument('--sortby', type=str,
                         help='Column to be sorted by. Default is by the columns "Citations", i.e., it will be sorted by the number of citations. If you want to sort by citations per year, use --sortby "cit/year"')
     parser.add_argument('--nresults', type=int,
                         help='Number of articles to search on Google Scholar. Default is 100. (carefull with robot checking if value is too high)')
-    parser.add_argument('--csvpath', type=str,
+    parser.add_argument('--path', type=str,
                         help='Path to save the exported csv file. By default it is the current folder')
-    parser.add_argument('--notsavecsv', action='store_true',
-                        help='By default results are going to be exported to a csv file. Select this option to just print results but not store them')
-    parser.add_argument('--plotresults', action='store_true',
-                        help='Use this flag in order to plot the results with the original rank in the x-axis and the number of citaions in the y-axis. Default is False')
-    parser.add_argument('--startyear', type=int, help='Start year when searching. Default is None')
-    parser.add_argument('--endyear', type=int, help='End year when searching. Default is current year')
-    parser.add_argument('--debug', action='store_true',
-                        help='Debug mode. Used for unit testing. It will get pages stored on web archive')
 
     args, _ = parser.parse_known_args()
 
     return GoogleScholarConfig(
         keyword=args.kw if args.kw else GoogleScholarConfig.keyword,
         nresults=args.nresults if args.nresults else GoogleScholarConfig.nresults,
-        save_csv=not args.notsavecsv,
-        csvpath=args.csvpath if args.csvpath else GoogleScholarConfig.csvpath,
+        csvpath=args.path if args.path else GoogleScholarConfig.csvpath,
         sortby=args.sortby if args.sortby else GoogleScholarConfig.sortby,
-        plot_results=args.plotresults,
-        start_year=args.startyear if args.startyear else GoogleScholarConfig.start_year,
-        end_year=args.endyear if args.endyear else GoogleScholarConfig.end_year,
-        debug=args.debug
+        source=args.source if args.source else GoogleScholarConfig.source
     )
 
 
@@ -169,16 +149,7 @@ def get_content_with_selenium(url):
 
 
 def create_main_url(GoogleScholarConfig: GoogleScholarConfig) -> str:
-    if GoogleScholarConfig.start_year:
-        gscholar_main_url = GSCHOLAR_URL + STARTYEAR_URL.format(GoogleScholarConfig.start_year)
-    else:
-        gscholar_main_url = GSCHOLAR_URL
-
-    if GoogleScholarConfig.end_year != current_year:
-        gscholar_main_url = gscholar_main_url + ENDYEAR_URL.format(GoogleScholarConfig.end_year)
-
-    if GoogleScholarConfig.debug:
-        gscholar_main_url = 'https://web.archive.org/web/20210314203256/' + GSCHOLAR_URL
+    gscholar_main_url = GSCHOLAR_URL
 
     return gscholar_main_url
 
@@ -205,9 +176,14 @@ def fetch_data(GoogleScholarConfig: GoogleScholarConfig, session: requests.Sessi
         if pbar is not None:
             pbar.update(10)
 
-        url = gscholar_main_url.format(str(n), GoogleScholarConfig.keyword.replace(' ', '+'))
-        if GoogleScholarConfig.debug:
-            print("Opening URL:", url)
+        source = GoogleScholarConfig.source.split(',')
+        source_text = ''
+        for i, s in enumerate(source):
+            source_text += f'source:\"{s}\"'
+            if i != len(source)-1:
+                source_text += f' OR '
+
+        url = gscholar_main_url.format(str(n), f'{GoogleScholarConfig.keyword.replace(',','+')} ({source_text})')
 
         # print("Loading next {} results".format(n + 10))
         page = session.get(url)
@@ -281,10 +257,7 @@ def fetch_data(GoogleScholarConfig: GoogleScholarConfig, session: requests.Sessi
     return data
 
 
-def process_data(data: pd.DataFrame, end_year: int, sortby: str) -> pd.DataFrame:
-    # Add columns with number of citations per year
-    data['cit/year'] = data['Citations'] / (end_year + 1 - data['Year'])
-    data['cit/year'] = data['cit/year'].round(0).astype(int)
+def process_data(data: pd.DataFrame, sortby: str) -> pd.DataFrame:
 
     # Sort by the selected columns, if exists
     try:
@@ -297,18 +270,10 @@ def process_data(data: pd.DataFrame, end_year: int, sortby: str) -> pd.DataFrame
     return data_ranked
 
 
-def plot_results(rank: List[int], citations: List[int], keyword: str) -> None:
-    plt.plot(rank, citations, '*')
-    plt.ylabel('Number of Citations')
-    plt.xlabel('Rank of the keyword on Google Scholar')
-    plt.title('Keyword: ' + keyword)
-    plt.show()
-
-
 def save_data_to_csv(data: pd.DataFrame, path: str, keyword: str) -> None:
     if not os.path.exists(path):
         os.makedirs(path)
-    fpath_csv = os.path.join(path, keyword.replace(' ', '_') + '.csv')
+    fpath_csv = os.path.join(path, keyword.replace(' ', '_').replace(':','-') + '.csv')
     fpath_csv = fpath_csv[:MAX_CSV_FNAME]
     data.to_csv(fpath_csv, encoding='utf-8')
 
