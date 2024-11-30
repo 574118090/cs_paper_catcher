@@ -1,5 +1,7 @@
 # CS Paper Catcher
 
+[English](README.md) | [中文](README.zh-CN.md)
+
 **CS Paper Catcher** is a web scraper based on Google Scholar, designed to fetch papers primarily in the field of **Computer Science** from specific conferences. This tool helps researchers quickly gather paper information from selected conferences in the CS domain and save the data in CSV format. Future plans include adding PDF download functionality.
 
 The project forked from [**google_scholar_spider**](https://github.com/JessyTsui/google_scholar_spider).
