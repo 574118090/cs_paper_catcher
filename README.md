@@ -12,7 +12,7 @@ The project forked from [**google_scholar_spider**](https://github.com/JessyTsui
 - Automatically save the fetched data as a CSV file.
 - Support two tasks:
   - `catch`: Fetch papers from Google Scholar and save them as a CSV.
-  - `download`: Downloads the PDF files of the papers listed in an existing CSV file. It creates a folder named after the CSV file and saves the PDFs of each paper in that folder. The CSV must contain valid links to the papers.
+  - `download`: Downloads the PDF files of the papers listed in an existing CSV file.
 
 ## Installation
 
@@ -77,7 +77,8 @@ This command will first fetch papers with the keyword "Reinforcement Learning" f
 Currently, the following source are supported for parsing and downloading papers:
 
 - **ACL**
-- **Openreview**
+- **NeuralPS**(from Openreview)
+- **ICML**(from Openreview)
 
 ## License
 
