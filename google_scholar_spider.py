@@ -1,32 +1,24 @@
-import argparse
 import datetime
 import os
-import sys
-import time
+import pandas as pd
+import requests
 import warnings
 from dataclasses import dataclass
 from time import sleep
-from typing import List, Optional
-import pandas as pd
-import requests
+from typing import List
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-now = datetime.datetime.now()
-current_year = now.year
 MAX_CSV_FNAME = 255
 
 # Websession Parameters
 GSCHOLAR_URL = 'https://scholar.google.com/scholar?start={}&q={}&hl=en&as_sdt=0,5'
-YEAR_RANGE = ''  # &as_ylo={start_year}&as_yhi={end_year}'
-# GSCHOLAR_URL_YEAR = GSCHOLAR_URL+YEAR_RANGE
-STARTYEAR_URL = '&as_ylo={}'
-ENDYEAR_URL = '&as_yhi={}'
 ROBOT_KW = ['unusual traffic from your computer network', 'not a robot']
 
 
 @dataclass
-class GoogleScholarConfig:
+class ArgsConfig:
+    task: str = "no task",
     keyword: str = "machine learning"
     nresults: int = 50
     save_csv: bool = True
@@ -36,46 +28,116 @@ class GoogleScholarConfig:
     source: str = 'ACL'
 
 
-def google_scholar_spider(GoogleScholarConfig: GoogleScholarConfig):
-    # Create main URL based on command line arguments
+def google_scholar_spider(GoogleScholarConfig: ArgsConfig):
+    """Main function to crawl Google Scholar and save results."""
     gscholar_main_url = create_main_url(GoogleScholarConfig)
 
-    # Start new session
     session = requests.Session()
 
-    # data = fetch_data(GoogleScholarConfig, session, gscholar_main_url)
     with tqdm(total=GoogleScholarConfig.nresults) as pbar:
-        # Call fetch_data() with pbar argument
         data = fetch_data(GoogleScholarConfig, session, gscholar_main_url, pbar)
 
-    # Create a dataset and sort by the number of citations
     data_ranked = process_data(data, GoogleScholarConfig.sortby)
 
     save_data_to_csv(data_ranked, GoogleScholarConfig.csvpath, f'{GoogleScholarConfig.source}_{GoogleScholarConfig.keyword}')
 
 
-def get_command_line_args() -> GoogleScholarConfig:
-    parser = argparse.ArgumentParser(description='Arguments')
-    parser.add_argument('--kw', type=str,
-                        help="""Keyword to be searched. Use double quote followed by simple quote to search for an exact keyword. Example: "'exact keyword'" """)
-    parser.add_argument('--source', type=str,
-                        help='')
-    parser.add_argument('--sortby', type=str,
-                        help='Column to be sorted by. Default is by the columns "Citations", i.e., it will be sorted by the number of citations. If you want to sort by citations per year, use --sortby "cit/year"')
-    parser.add_argument('--nresults', type=int,
-                        help='Number of articles to search on Google Scholar. Default is 100. (carefull with robot checking if value is too high)')
-    parser.add_argument('--path', type=str,
-                        help='Path to save the exported csv file. By default it is the current folder')
+def create_main_url(GoogleScholarConfig: ArgsConfig) -> str:
+    """Create the main URL for Google Scholar search."""
+    gscholar_main_url = GSCHOLAR_URL
+    return gscholar_main_url
 
-    args, _ = parser.parse_known_args()
 
-    return GoogleScholarConfig(
-        keyword=args.kw if args.kw else GoogleScholarConfig.keyword,
-        nresults=args.nresults if args.nresults else GoogleScholarConfig.nresults,
-        csvpath=args.path if args.path else GoogleScholarConfig.csvpath,
-        sortby=args.sortby if args.sortby else GoogleScholarConfig.sortby,
-        source=args.source if args.source else GoogleScholarConfig.source
-    )
+def fetch_data(GoogleScholarConfig: ArgsConfig, session: requests.Session, gscholar_main_url: str,
+               pbar: tqdm) -> pd.DataFrame:
+    """Fetch data from Google Scholar search results."""
+    links: List[str] = []
+    title: List[str] = []
+    citations: List[int] = []
+    year: List[int] = []
+    author: List[str] = []
+    venue: List[str] = []
+    publisher: List[str] = []
+    rank: List[int] = [0]
+    describe: List[str] = []
+
+    if pbar is not None:
+        pbar.reset(total=GoogleScholarConfig.nresults)
+
+    for n in range(0, GoogleScholarConfig.nresults, 10):
+        if pbar is not None:
+            pbar.update(10)
+
+        source = GoogleScholarConfig.source.split(',')
+        source_text = ''
+        for i, s in enumerate(source):
+            source_text += f'source:{s}'
+            if i != len(source)-1:
+                source_text += f' OR '
+        url = gscholar_main_url.format(str(n), f'{GoogleScholarConfig.keyword.replace(",", "+")} ({source_text})')
+
+
+        page = session.get(url)
+        c = page.content
+
+        if any(kw in c.decode('ISO-8859-1') for kw in ROBOT_KW):
+            print("Robot checking detected, handling with selenium (if installed)")
+            c = get_content_with_selenium(url)
+
+        soup = BeautifulSoup(c, 'html.parser', from_encoding='utf-8')
+        mydivs = soup.findAll("div", {"class": "gs_or"})
+
+        for div in mydivs:
+            try:
+                links.append(div.find('h3').find('a').get('href'))
+            except:
+                links.append('Look manually at: ' + url)
+
+            try:
+                title.append(div.find('h3').find('a').text)
+            except:
+                title.append('Could not catch title')
+
+            try:
+                citations.append(get_citations(str(div.format_string)))
+            except:
+                warnings.warn(f"Number of citations not found for {title[-1]}. Appending 0")
+                citations.append(0)
+
+            try:
+                year.append(get_year(div.find('div', {'class': 'gs_a'}).text))
+            except:
+                warnings.warn(f"Year not found for {title[-1]}, appending 0")
+                year.append(0)
+
+            try:
+                author.append(get_author(div.find('div', {'class': 'gs_a'}).text))
+            except:
+                author.append("Author not found")
+
+            try:
+                publisher.append(div.find('div', {'class': 'gs_a'}).text.split("-")[-1])
+            except:
+                publisher.append("Publisher not found")
+
+            try:
+                venue.append(" ".join(div.find('div', {'class': 'gs_a'}).text.split("-")[-2].split(",")[:-1]))
+            except:
+                venue.append("Venue not found")
+
+            try:
+                describe.append(get_author(div.find('div', {'class': 'gs_rs'}).text))
+            except:
+                describe.append("Describe not found")
+
+            rank.append(rank[-1] + 10)
+
+        sleep(0.5)
+
+    data = pd.DataFrame(list(zip(author, title, citations, year, publisher, venue, describe, links)), index=rank[1:],
+                        columns=['Author', 'Title', 'Citations', 'Year', 'Publisher', 'Venue', 'describe', 'Source'])
+    data.index.name = 'Rank'
+    return data
 
 
 def get_citations(content):
@@ -95,198 +157,31 @@ def get_year(content):
     return int(out)
 
 
-def setup_driver():
-    try:
-        from selenium import webdriver
-        from selenium.common.exceptions import StaleElementReferenceException
-        from selenium.webdriver.chrome.options import Options
-    except Exception as e:
-        print(e)
-        print("Please install Selenium and chrome webdriver for manual checking of captchas")
-
-    # print('Loading...')
-    chrome_options = Options()
-    chrome_options.add_argument("disable-infobars")
-    driver = webdriver.Chrome(chrome_options=chrome_options)
-    return driver
-
-
 def get_author(content):
     author_end = content.find('-')
     return content[2:author_end - 1]
 
 
-def get_element(driver, xpath, attempts=5, count=0):
-    '''Safe get_element method with multiple attempts'''
-    try:
-        # Selenium just removed find_element_by_xpath in version 4.3.0.
-        element = driver.find_element("xpath", xpath) 
-        return element
-    except Exception as e:
-        if count < attempts:
-            sleep(1)
-            get_element(driver, xpath, attempts=attempts, count=count + 1)
-        else:
-            print("Element not found")
-
-
 def get_content_with_selenium(url):
-    global driver
-    if 'driver' not in globals():
-        driver = setup_driver()
-
-    driver.get(url)
-    el = get_element(driver, "/html/body")
-    content = el.get_attribute('innerHTML')
-
-    if any(kw in content for kw in ROBOT_KW):
-        input("Solve captcha manually and press enter here to continue...")
-        driver.get(url)
-        el = get_element(driver, "/html/body")
-        content = el.get_attribute('innerHTML')
-
-    return content.encode('utf-8')
-
-
-def create_main_url(GoogleScholarConfig: GoogleScholarConfig) -> str:
-    gscholar_main_url = GSCHOLAR_URL
-
-    return gscholar_main_url
-
-
-def fetch_data(GoogleScholarConfig: GoogleScholarConfig, session: requests.Session, gscholar_main_url: str,
-               pbar: None) -> pd.DataFrame:
-    links: List[str] = []
-    title: List[str] = []
-    citations: List[int] = []
-    year: List[int] = []
-    author: List[str] = []
-    venue: List[str] = []
-    publisher: List[str] = []
-    rank: List[int] = [0]
-    describe: List[str] = []
-
-    # Initialize progress bar
-    if pbar is not None:
-        pbar.reset(total=GoogleScholarConfig.nresults)
-
-    # Get content from number_of_results URLs
-    for n in range(0, GoogleScholarConfig.nresults, 10):
-
-        if pbar is not None:
-            pbar.update(10)
-
-        source = GoogleScholarConfig.source.split(',')
-        source_text = ''
-        for i, s in enumerate(source):
-            source_text += f'source:\"{s}\"'
-            if i != len(source)-1:
-                source_text += f' OR '
-
-        url = gscholar_main_url.format(str(n), f'{GoogleScholarConfig.keyword.replace(',','+')} ({source_text})')
-
-        # print("Loading next {} results".format(n + 10))
-        page = session.get(url)
-        c = page.content
-
-        if any(kw in c.decode('ISO-8859-1') for kw in ROBOT_KW):
-            print("Robot checking detected, handling with selenium (if installed)")
-            try:
-                c = get_content_with_selenium(url)
-            except Exception as e:
-                print("No success. The following error was raised:")
-                print(e)
-
-        # Create parser
-        soup = BeautifulSoup(c, 'html.parser', from_encoding='utf-8')
-
-        # Get stuff
-        mydivs = soup.findAll("div", {"class": "gs_or"})
-
-        for div in mydivs:
-            try:
-                links.append(div.find('h3').find('a').get('href'))
-            except:  # catch *all* exceptions
-                links.append('Look manually at: ' + url)
-
-            try:
-                title.append(div.find('h3').find('a').text)
-            except:
-                title.append('Could not catch title')
-
-            try:
-                citations.append(get_citations(str(div.format_string)))
-            except:
-                warnings.warn("Number of citations not found for {}. Appending 0".format(title[-1]))
-                citations.append(0)
-
-            try:
-                year.append(get_year(div.find('div', {'class': 'gs_a'}).text))
-            except:
-                warnings.warn("Year not found for {}, appending 0".format(title[-1]))
-                year.append(0)
-
-            try:
-                author.append(get_author(div.find('div', {'class': 'gs_a'}).text))
-            except:
-                author.append("Author not found")
-
-            try:
-                publisher.append(div.find('div', {'class': 'gs_a'}).text.split("-")[-1])
-            except:
-                publisher.append("Publisher not found")
-
-            try:
-                venue.append(" ".join(div.find('div', {'class': 'gs_a'}).text.split("-")[-2].split(",")[:-1]))
-            except:
-                venue.append("Venue not fount")
-            
-            try:
-                describe.append(get_author(div.find('div', {'class': 'gs_rs'}).text))
-            except:
-                describe.append("Describe not fount")
-
-            rank.append(rank[-1] + 10)
-
-        # Delay
-        sleep(0.5)
-    # Create a dataset
-    data = pd.DataFrame(list(zip(author, title, citations, year, publisher, venue, describe, links)), index=rank[1:],
-                        columns=['Author', 'Title', 'Citations', 'Year', 'Publisher', 'Venue', 'describe', 'Source'])
-    data.index.name = 'Rank'
-    return data
+    print("Selenium method not implemented yet.")
+    return ''
 
 
 def process_data(data: pd.DataFrame, sortby: str) -> pd.DataFrame:
-
-    # Sort by the selected columns, if exists
+    """Process the data by sorting it."""
     try:
         data_ranked = data.sort_values(by=sortby, ascending=False)
     except Exception as e:
-        print('Column name to be sorted not found. Sorting by the number of citations...')
+        print(f"Error sorting by {sortby}, sorting by Citations instead.")
         data_ranked = data.sort_values(by='Citations', ascending=False)
         print(e)
-
     return data_ranked
 
 
 def save_data_to_csv(data: pd.DataFrame, path: str, keyword: str) -> None:
+    """Save the processed data to a CSV file."""
     if not os.path.exists(path):
         os.makedirs(path)
     fpath_csv = os.path.join(path, keyword.replace(' ', '_').replace(':','-') + '.csv')
     fpath_csv = fpath_csv[:MAX_CSV_FNAME]
     data.to_csv(fpath_csv, encoding='utf-8')
-
-
-if __name__ == '__main__':
-    print("Getting command line arguments...")
-    start = time.time()
-    GoogleScholarConfig = get_command_line_args()
-    print("Running Google Scholar spider...")
-    google_scholar_spider(GoogleScholarConfig=GoogleScholarConfig)
-    # with tqdm(total=GoogleScholarConfig.nresults) as pbar:
-    #     google_scholar_spider(GoogleScholarConfig=GoogleScholarConfig, pbar=pbar)
-
-    end = time.time()
-    print("Finished running Google Scholar spider!")
-    print(f"Time taken: {end - start:.2f} seconds")
