@@ -51,7 +51,7 @@ python paper_cathcer.py --task catch --kw "Machine Learning" --source "ICML 2024
 #### Example 1: Catch data from Google Scholar
 
 ```
-python main.py --task catch --kw "Deep Learning" --source "CVPR 2023" --nresults 50 --path "./cvpr_papers"
+python paper_catcher.py --task catch --kw "Deep Learning" --source "CVPR 2023" --nresults 50 --path "./cvpr_papers"
 ```
 
 This command will search for papers with the keyword "Deep Learning" in the "CVPR" conference and save the results to the `./cvpr_papers` folder.
@@ -59,14 +59,25 @@ This command will search for papers with the keyword "Deep Learning" in the "CVP
 #### Example 2: Download and process a CSV file
 
 ```
-python main.py --task download --path "./cvpr_papers/CVPR_2023_Deep_Learning.csv"
+python paper_catcher.py --task download --path "./cvpr_papers/CVPR_2023_Deep_Learning.csv"
 ```
 
 This will create a folder with the same name as the CSV file and store the PDFs of each paper in that folder.
 
-## Development Plan
+#### Example 3: Catch data and download the PDFs
 
-- PDF download functionality will be added in the future, allowing automatic downloading of the papers in PDF format.
+```
+python paper_catcher.py --task catch&download --kw "Reinforcement Learning" --source "NeurIPS 2024" --nresults 50 --path "./neurips_papers"
+```
+
+This command will first fetch papers with the keyword "Reinforcement Learning" from the "NeurIPS 2024" conference and then download the corresponding PDFs to the `./neurips_papers` folder.
+
+## Supported Source for Parsing and Download
+
+Currently, the following source are supported for parsing and downloading papers:
+
+- **ACL**
+- **Openreview**
 
 ## License
 
