@@ -2,13 +2,13 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-**CS Paper Catcher** 是一个基于 Google Scholar 的网页爬虫，旨在帮助用户快速抓取计算机科学领域特定会议的论文信息，并将数据保存为 CSV 格式。未来计划添加 PDF 下载功能。
+**CS Paper Catcher** 是一个基于 Google Scholar 的网页爬虫，旨在帮助用户快速抓取计算机科学领域特定会议或期刊的论文信息，并将数据保存为 CSV 格式。此外，工具还支持直接下载论文的 PDF 文件，进一步方便用户获取相关资源。**目前该工具仅支持下载部分来源的论文，我正在逐步完善对更多来源的支持。**
 
 该项目是从 [**google_scholar_spider**](https://github.com/JessyTsui/google_scholar_spider) 项目派生的。
 
 ## 功能
 
-- 根据关键词和会议名称搜索论文。
+- 根据关键词和会议、期刊名称搜索论文。
 - 按引用次数对论文进行排序。
 - 根据特定年份（起始年和结束年）筛选论文。
 - 自动将抓取的数据保存为 CSV 文件。
@@ -74,9 +74,9 @@ python paper_catcher.py --task catch&download --kw "强化学习" --source "Neur
 
 此命令将首先抓取关键词为“强化学习”的“NeurIPS 2024”会议论文，然后下载对应的 PDF 文件到 `./neurips_papers` 文件夹中。
 
-## 支持的源
+## 可下载的论文来源
 
-目前支持以下会议的论文解析与下载：
+目前支持下载以下来源的论文：
 
 - **ACL**
 - **NeuralPS**（来自 Openreview）

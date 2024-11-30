@@ -2,13 +2,13 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-**CS Paper Catcher** is a web scraper based on Google Scholar, designed to fetch papers primarily in the field of **Computer Science** from specific conferences. This tool helps researchers quickly gather paper information from selected conferences in the CS domain and save the data in CSV format. Future plans include adding PDF download functionality.
+**CS Paper Catcher** is a web scraper based on Google Scholar, designed to fetch papers primarily in the field of **Computer Science** from specific sources. This tool helps researchers quickly gather paper information from selected sources in the CS domain and save the data in CSV format. Additionally, the tool now supports downloading the PDFs of the papers. Currently, it supports a limited number of sources, and future plans include expanding support for more sources.
 
 The project forked from [**google_scholar_spider**](https://github.com/JessyTsui/google_scholar_spider).
 
 ## Features
 
-- Search for papers based on keywords and conference names.
+- Search for papers based on keywords and sources(conferences, journals) names.
 - Sort papers by citation count.
 - Filter papers by specific years (start and end year).
 - Automatically save the fetched data as a CSV file.
@@ -76,7 +76,7 @@ This command will first fetch papers with the keyword "Reinforcement Learning" f
 
 ## Supported Source for Parsing and Download
 
-Currently, the following source are supported for parsing and downloading papers:
+Currently, the following source are supported for downloading papers:
 
 - **ACL**
 - **NeuralPS**(from Openreview)
