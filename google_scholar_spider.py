@@ -11,10 +11,14 @@ from tqdm import tqdm
 
 MAX_CSV_FNAME = 255
 
+now = datetime.datetime.now()
+current_year = now.year
+
 # Websession Parameters
 GSCHOLAR_URL = 'https://scholar.google.com/scholar?start={}&q={}&hl=en&as_sdt=0,5'
 ROBOT_KW = ['unusual traffic from your computer network', 'not a robot']
-
+STARTYEAR_URL = '&as_ylo={}'
+ENDYEAR_URL = '&as_yhi={}'
 
 @dataclass
 class ArgsConfig:
@@ -29,7 +33,6 @@ class ArgsConfig:
 
 
 def google_scholar_spider(GoogleScholarConfig: ArgsConfig):
-    """Main function to crawl Google Scholar and save results."""
     gscholar_main_url = create_main_url(GoogleScholarConfig)
 
     session = requests.Session()
@@ -43,14 +46,19 @@ def google_scholar_spider(GoogleScholarConfig: ArgsConfig):
 
 
 def create_main_url(GoogleScholarConfig: ArgsConfig) -> str:
-    """Create the main URL for Google Scholar search."""
-    gscholar_main_url = GSCHOLAR_URL
+    if GoogleScholarConfig.year:
+        gscholar_main_url = GSCHOLAR_URL + STARTYEAR_URL.format(GoogleScholarConfig.year)
+    else:
+        gscholar_main_url = GSCHOLAR_URL
+
+    if GoogleScholarConfig.year != current_year:
+        gscholar_main_url = gscholar_main_url + ENDYEAR_URL.format(GoogleScholarConfig.year)
+    
     return gscholar_main_url
 
 
 def fetch_data(GoogleScholarConfig: ArgsConfig, session: requests.Session, gscholar_main_url: str,
                pbar: tqdm) -> pd.DataFrame:
-    """Fetch data from Google Scholar search results."""
     links: List[str] = []
     title: List[str] = []
     citations: List[int] = []
@@ -101,13 +109,11 @@ def fetch_data(GoogleScholarConfig: ArgsConfig, session: requests.Session, gscho
             try:
                 citations.append(get_citations(str(div.format_string)))
             except:
-                warnings.warn(f"Number of citations not found for {title[-1]}. Appending 0")
                 citations.append(0)
 
             try:
                 year.append(get_year(div.find('div', {'class': 'gs_a'}).text))
             except:
-                warnings.warn(f"Year not found for {title[-1]}, appending 0")
                 year.append(0)
 
             try:

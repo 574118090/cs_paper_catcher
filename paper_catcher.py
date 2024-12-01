@@ -15,11 +15,13 @@ def get_command_line_args() -> ArgsConfig:
     parser.add_argument('--sortby', type=str, help='Column to be sorted by. Default is "Citations".')
     parser.add_argument('--nresults', type=int, help='Number of articles to search on Google Scholar. Default is 100.')
     parser.add_argument('--path', type=str, help='Path to save the exported CSV file. Default is the current folder')
+    parser.add_argument('--year', type=int, help='year')
 
     args, _ = parser.parse_known_args()
 
     return ArgsConfig(
         task=args.task,
+        year=args.year,
         keyword=args.kw if args.kw else ArgsConfig.keyword,
         nresults=args.nresults if args.nresults else ArgsConfig.nresults,
         csvpath=args.path if args.path else ArgsConfig.csvpath,

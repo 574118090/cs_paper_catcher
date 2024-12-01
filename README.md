@@ -10,11 +10,12 @@ The project forked from [**google_scholar_spider**](https://github.com/JessyTsui
 
 - Search for papers based on keywords and sources(conferences, journals) names.
 - Sort papers by citation count.
-- Filter papers by specific years (start and end year).
+- Filter papers by specific years.
 - Automatically save the fetched data as a CSV file.
 - Support two tasks:
   - `catch`: Fetch papers from Google Scholar and save them as a CSV.
   - `download`: Downloads the PDF files of the papers listed in an existing CSV file.
+  - `catch&download`: Process both tasks.
 
 ## Installation
 
@@ -36,24 +37,25 @@ The project forked from [**google_scholar_spider**](https://github.com/JessyTsui
 ### Command Line Arguments
 
 ```
-python paper_cathcer.py --task catch --kw "Machine Learning" --source "ICML 2024, ACL 2024" --nresults 50 --path "./papers"
+python paper_cathcer.py --task "catch" --kw "Machine Learning" --source "ICML,ACL" --year 2024 --nresults 50 --path "./papers"
 ```
 
 ### Argument Description
 
-- `--task`: The task to perform. Choose either `catch` or `download`.
+- `--task`: The task to perform. Choose either `catch` or `download`or`catch&download`.
 - `--kw`: The keyword to search for (required).
 - `--source`: The name of the conference or journal to filter papers by (optional).
 - `--sortby`: The column to sort by (optional, default is "Citations").
 - `--nresults`: The number of search results to fetch (optional, default is 100).
 - `--path`: The path to save or process the CSV file (optional, default is the current directory).
+- `--year`:The publication year of the paper.
 
 ### Examples
 
 #### Example 1: Catch data from Google Scholar
 
 ```
-python paper_catcher.py --task catch --kw "Deep Learning" --source "CVPR 2023" --nresults 50 --path "./cvpr_papers"
+python paper_catcher.py --task "catch" --kw "Deep Learning" --source "CVPR" --year 2023 --nresults 50 --path "./cvpr_papers" 
 ```
 
 This command will search for papers with the keyword "Deep Learning" in the "CVPR" conference and save the results to the `./cvpr_papers` folder.
@@ -61,7 +63,7 @@ This command will search for papers with the keyword "Deep Learning" in the "CVP
 #### Example 2: Download and process a CSV file
 
 ```
-python paper_catcher.py --task download --path "./cvpr_papers/CVPR_2023_Deep_Learning.csv"
+python paper_catcher.py --task "download" --path "./cvpr_papers/CVPR_2023_Deep_Learning.csv"
 ```
 
 This will create a folder with the same name as the CSV file and store the PDFs of each paper in that folder.
@@ -69,7 +71,7 @@ This will create a folder with the same name as the CSV file and store the PDFs 
 #### Example 3: Catch data and download the PDFs
 
 ```
-python paper_catcher.py --task catch&download --kw "Reinforcement Learning" --source "NeurIPS 2024" --nresults 50 --path "./neurips_papers"
+python paper_catcher.py --task "catch&download" --kw "Large Language Model" --source "NeurIPS" --year 2024 --nresults 50 --path "./neurips_papers"
 ```
 
 This command will first fetch papers with the keyword "Reinforcement Learning" from the "NeurIPS 2024" conference and then download the corresponding PDFs to the `./neurips_papers` folder.
@@ -81,6 +83,8 @@ Currently, the following source are supported for downloading papers:
 - **ACL**
 - **NeuralPS**(from Openreview)
 - **ICML**(from Openreview)
+- **ICLR**(from Openreview)
+- **AAAI**
 
 ## License
 
